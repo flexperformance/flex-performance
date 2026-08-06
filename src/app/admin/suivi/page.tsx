@@ -16,9 +16,16 @@ interface Vehicle {
   notes: string;
   included_services: string;
   price: string; // AJOUTÉ : Prix de la prestation
+  created_at?: string;
 }
 
-const ADMIN_PASSWORD = "23812553";
+// ⚠️ Idéalement ce mot de passe ne devrait jamais être exposé côté client.
+// En attendant une vraie route d'authentification côté serveur, on le lit
+// depuis une variable d'environnement pour pouvoir au moins le changer
+// sans toucher au code (ajouter NEXT_PUBLIC_ADMIN_PASSWORD dans .env.local).
+const ADMIN_PASSWORD = process.env.NEXT_PUBLIC_ADMIN_PASSWORD || "23812553";
+const MAX_LOGIN_ATTEMPTS = 5;
+const LOCKOUT_DURATION_MS = 60 * 1000; // 1 minute
 
 const DEFAULT_PRESET_SERVICES = [
   "Diagnostic Électronique + Optimisation Moteur",
@@ -33,6 +40,8 @@ export default function AdminSuiviPage() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [inputPassword, setInputPassword] = useState("");
   const [authError, setAuthError] = useState("");
+  const [loginAttempts, setLoginAttempts] = useState(0);
+  const [lockedUntil, setLockedUntil] = useState<number | null>(null);
 
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [searchFilter, setSearchFilter] = useState("");
@@ -40,6 +49,8 @@ export default function AdminSuiviPage() {
   const [message, setMessage] = useState("");
 
   const [showArchives, setShowArchives] = useState(false);
+  const [archiveDateFrom, setArchiveDateFrom] = useState("");
+  const [archiveDateTo, setArchiveDateTo] = useState("");
 
   const [newToken, setNewToken] = useState("");
   const [newClient, setNewClient] = useState("");
@@ -83,12 +94,28 @@ export default function AdminSuiviPage() {
 
   const handleLogin = (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (lockedUntil && Date.now() < lockedUntil) {
+      const secondsLeft = Math.ceil((lockedUntil - Date.now()) / 1000);
+      setAuthError(`Trop de tentatives. Réessayez dans ${secondsLeft}s.`);
+      return;
+    }
+
     if (inputPassword === ADMIN_PASSWORD) {
       setIsAuthenticated(true);
       sessionStorage.setItem("flex_admin_auth", "true");
       setAuthError("");
+      setLoginAttempts(0);
+      setLockedUntil(null);
     } else {
-      setAuthError("Mot de passe incorrect.");
+      const nextAttempts = loginAttempts + 1;
+      setLoginAttempts(nextAttempts);
+      if (nextAttempts >= MAX_LOGIN_ATTEMPTS) {
+        setLockedUntil(Date.now() + LOCKOUT_DURATION_MS);
+        setAuthError(`Trop de tentatives échouées. Compte verrouillé ${LOCKOUT_DURATION_MS / 1000}s.`);
+      } else {
+        setAuthError(`Mot de passe incorrect. (${nextAttempts}/${MAX_LOGIN_ATTEMPTS} tentatives)`);
+      }
     }
   };
 
@@ -462,6 +489,39 @@ export default function AdminSuiviPage() {
     printWindow.document.close();
   };
 
+  const handleExportCSV = () => {
+    if (vehicles.length === 0) {
+      setMessage("Aucun dossier à exporter.");
+      setTimeout(() => setMessage(""), 3000);
+      return;
+    }
+
+    const headers = [
+      "Token", "Client", "Téléphone", "Véhicule", "Plaque",
+      "Kilométrage", "Étape", "Date/Heure prévue", "Prestations",
+      "Prix", "Notes",
+    ];
+
+    const escapeCsv = (value: string) => `"${(value || "").replace(/"/g, '""')}"`;
+
+    const rows = vehicles.map((v) => [
+      v.token, v.client_name, v.phone, v.vehicle, v.plate,
+      v.mileage, String(v.current_step), v.estimated_time,
+      v.included_services, v.price, v.notes,
+    ].map(escapeCsv).join(";"));
+
+    const csvContent = "\uFEFF" + [headers.map(escapeCsv).join(";"), ...rows].join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `flex-performance-dossiers-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   const handleAddPresetService = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newPresetInput.trim()) return;
@@ -494,11 +554,31 @@ export default function AdminSuiviPage() {
   });
 
   const activeVehicles = searchedVehicles.filter((v) => v.current_step < 6);
-  const archivedVehicles = searchedVehicles.filter((v) => v.current_step === 6);
+  const archivedVehicles = searchedVehicles
+    .filter((v) => v.current_step === 6)
+    .filter((v) => {
+      if (!archiveDateFrom && !archiveDateTo) return true;
+      const datePart = v.estimated_time ? v.estimated_time.split(" à ")[0] : "";
+      if (!datePart) return true;
+      if (archiveDateFrom && datePart < archiveDateFrom) return false;
+      if (archiveDateTo && datePart > archiveDateTo) return false;
+      return true;
+    });
 
   const statsTotalActive = vehicles.filter(v => v.current_step < 6).length;
   const statsReady = vehicles.filter(v => v.current_step === 5).length;
   const statsArchived = vehicles.filter(v => v.current_step === 6).length;
+
+  const parsePriceToNumber = (price: string) => {
+    if (!price) return 0;
+    const cleaned = price.replace(/[^0-9,.-]/g, "").replace(",", ".");
+    const num = parseFloat(cleaned);
+    return isNaN(num) ? 0 : num;
+  };
+
+  const statsRevenueArchived = vehicles
+    .filter((v) => v.current_step === 6)
+    .reduce((total, v) => total + parsePriceToNumber(v.price), 0);
 
   const hours = Array.from({ length: 15 }, (_, i) => String(i + 8).padStart(2, "0"));
   const minutes = ["00", "15", "30", "45"];
@@ -525,7 +605,8 @@ export default function AdminSuiviPage() {
             {authError && <p className="text-red-400 text-sm font-display uppercase tracking-wider">{authError}</p>}
             <button
               type="submit"
-              className="w-full bg-flux text-ink font-display text-sm font-bold uppercase py-4 rounded-2xl hover:bg-white transition-all cursor-pointer tracking-wider shadow-lg"
+              disabled={!!lockedUntil && Date.now() < lockedUntil}
+              className="w-full bg-flux text-ink font-display text-sm font-bold uppercase py-4 rounded-2xl hover:bg-white transition-all cursor-pointer tracking-wider shadow-lg disabled:opacity-40 disabled:cursor-not-allowed"
             >
               Se connecter
             </button>
@@ -794,6 +875,13 @@ export default function AdminSuiviPage() {
             <span>⚙️</span> <span>Gérer mes packs ({presetServicesList.length})</span>
           </button>
           <button
+            onClick={handleExportCSV}
+            className="bg-panel border border-line text-snow font-display text-xs font-bold uppercase px-5 py-3 rounded-2xl hover:border-flux hover:text-flux transition-all cursor-pointer tracking-wider flex items-center gap-2"
+            title="Exporter tous les dossiers en CSV (compta / Excel)"
+          >
+            <span>📊</span> <span>Export CSV</span>
+          </button>
+          <button
             onClick={() => {
               sessionStorage.removeItem("flex_admin_auth");
               setIsAuthenticated(false);
@@ -805,7 +893,7 @@ export default function AdminSuiviPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-10">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-10">
         <div className="bg-panel/90 border border-flux/30 p-5 rounded-3xl backdrop-blur-md flex items-center justify-between shadow-lg">
           <div>
             <span className="text-[11px] font-mono text-mute uppercase tracking-widest block mb-1">En cours en atelier</span>
@@ -828,6 +916,14 @@ export default function AdminSuiviPage() {
             <span className="text-3xl font-display font-black text-snow">{statsArchived}</span>
           </div>
           <span className="text-3xl p-3 bg-ink-2 rounded-2xl border border-line">📂</span>
+        </div>
+
+        <div className="bg-panel/90 border border-emerald-500/30 p-5 rounded-3xl backdrop-blur-md flex items-center justify-between shadow-lg">
+          <div>
+            <span className="text-[11px] font-mono text-mute uppercase tracking-widest block mb-1">CA Archivé (total)</span>
+            <span className="text-2xl font-display font-black text-emerald-400 font-mono">{statsRevenueArchived.toLocaleString("fr-FR")} €</span>
+          </div>
+          <span className="text-3xl p-3 bg-emerald-500/10 rounded-2xl border border-emerald-500/20">💰</span>
         </div>
       </div>
 
@@ -1123,6 +1219,32 @@ export default function AdminSuiviPage() {
 
         {showArchives && (
           <div className="space-y-6 animate-fade-in">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 bg-panel/50 border border-line/60 p-4 rounded-2xl">
+              <span className="text-xs font-mono text-mute uppercase tracking-wider shrink-0">📅 Filtrer par date :</span>
+              <div className="flex items-center gap-2">
+                <input
+                  type="date"
+                  value={archiveDateFrom}
+                  onChange={(e) => setArchiveDateFrom(e.target.value)}
+                  className="bg-ink-2 border border-line px-3 py-2 rounded-xl text-xs text-snow focus:outline-none focus:border-flux"
+                />
+                <span className="text-mute text-xs">à</span>
+                <input
+                  type="date"
+                  value={archiveDateTo}
+                  onChange={(e) => setArchiveDateTo(e.target.value)}
+                  className="bg-ink-2 border border-line px-3 py-2 rounded-xl text-xs text-snow focus:outline-none focus:border-flux"
+                />
+              </div>
+              {(archiveDateFrom || archiveDateTo) && (
+                <button
+                  onClick={() => { setArchiveDateFrom(""); setArchiveDateTo(""); }}
+                  className="text-xs text-red-400 hover:text-red-300 font-mono underline cursor-pointer"
+                >
+                  Réinitialiser
+                </button>
+              )}
+            </div>
             {archivedVehicles.length === 0 ? (
               <div className="border border-line/50 bg-panel/30 p-10 rounded-3xl text-center text-mute text-xs tracking-wider uppercase font-mono">
                 Aucune archive pour le moment.

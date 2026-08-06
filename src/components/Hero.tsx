@@ -4,11 +4,11 @@ import { Reveal, SkewButton } from "./ui";
 import Simulator from "./Simulator";
 
 const STATS = [
-  { value: "+500", label: "véhicules reprogrammés" },
+  { value: "100%", label: "satisfaction client" },
   { value: "+35 cv", label: "gain moyen en Stage 1" },
   { value: "-40%", label: "d'économie sur le plein (E85)" },
   { value: "1 an", label: "garantie & remise d'origine offerte" },
-];
+];   
 
 export default function Hero() {
   return (

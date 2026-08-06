@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 // Base de données Stage 1 uniquement
 const VEHICLES_DATABASE = [
@@ -73,6 +73,63 @@ const VEHICLES_DATABASE = [
   { brand: 'Volkswagen', model: 'Polo 6 - 1.0 TSI 95', hpOrig: 95, hpTune: 130, nmOrig: 175, nmTune: 220, fuel: 'Essence', consumption: 5.2, tankSize: 40 },
 
 ];
+
+function GainGauge({
+  label,
+  unit,
+  origValue,
+  tuneValue,
+}: {
+  label: string;
+  unit: string;
+  origValue: number;
+  tuneValue: number;
+}) {
+  const [animated, setAnimated] = useState(false);
+
+  useEffect(() => {
+    setAnimated(false);
+    const timer = setTimeout(() => setAnimated(true), 50);
+    return () => clearTimeout(timer);
+  }, [origValue, tuneValue]);
+
+  const origPercent = tuneValue > 0 ? (origValue / tuneValue) * 100 : 0;
+
+  return (
+    <div className="bg-slate-950/80 p-4 rounded-xl border border-slate-800">
+      <div className="flex justify-between text-sm mb-1">
+        <span className="text-slate-400">{label}</span>
+        <span className="text-emerald-400 font-bold">
+          +{tuneValue - origValue} {unit}
+        </span>
+      </div>
+      <div className="flex items-baseline justify-between mb-2">
+        <span className="text-slate-500 text-xs">
+          Origine: {origValue} {unit}
+        </span>
+        <span className="text-2xl font-black text-cyan-400">
+          {tuneValue} <span className="text-sm">{unit}</span>
+        </span>
+      </div>
+
+      {/* Jauge comparative animée : dégradé = valeur après reprog, gris = valeur d'origine */}
+      <div className="relative h-3 bg-slate-800 rounded-full overflow-hidden">
+        <div
+          className="absolute inset-y-0 left-0 bg-gradient-to-r from-cyan-500 to-blue-500 rounded-full transition-all duration-[1200ms] ease-out"
+          style={{ width: animated ? '100%' : '0%' }}
+        />
+        <div
+          className="absolute inset-y-0 left-0 bg-slate-400 rounded-full transition-all duration-[900ms] ease-out delay-100"
+          style={{ width: animated ? `${origPercent}%` : '0%' }}
+        />
+      </div>
+      <div className="flex justify-between mt-1">
+        <span className="text-[10px] text-slate-500">Origine</span>
+        <span className="text-[10px] text-cyan-400 font-semibold">Après reprog</span>
+      </div>
+    </div>
+  );
+}
 
 export default function Simulator() {
   const [selectedBrand, setSelectedBrand] = useState('');
@@ -171,39 +228,19 @@ export default function Simulator() {
       {/* Affichage des Gains Stage 1 */}
       {currentVehicle ? (
         <div className="space-y-4">
-          <div className="bg-slate-950/80 p-4 rounded-xl border border-slate-800">
-            <div className="flex justify-between text-sm mb-1">
-              <span className="text-slate-400">Puissance moteur</span>
-              <span className="text-emerald-400 font-bold">
-                +{currentVehicle.hpTune - currentVehicle.hpOrig} ch
-              </span>
-            </div>
-            <div className="flex items-baseline justify-between">
-              <span className="text-slate-500 text-xs">
-                Origine: {currentVehicle.hpOrig} ch
-              </span>
-              <span className="text-2xl font-black text-cyan-400">
-                {currentVehicle.hpTune} <span className="text-sm">ch</span>
-              </span>
-            </div>
-          </div>
+          <GainGauge
+            label="Puissance moteur"
+            unit="ch"
+            origValue={currentVehicle.hpOrig}
+            tuneValue={currentVehicle.hpTune}
+          />
 
-          <div className="bg-slate-950/80 p-4 rounded-xl border border-slate-800">
-            <div className="flex justify-between text-sm mb-1">
-              <span className="text-slate-400">Couple moteur</span>
-              <span className="text-emerald-400 font-bold">
-                +{currentVehicle.nmTune - currentVehicle.nmOrig} Nm
-              </span>
-            </div>
-            <div className="flex items-baseline justify-between">
-              <span className="text-slate-500 text-xs">
-                Origine: {currentVehicle.nmOrig} Nm
-              </span>
-              <span className="text-2xl font-black text-cyan-400">
-                {currentVehicle.nmTune} <span className="text-sm">Nm</span>
-              </span>
-            </div>
-          </div>
+          <GainGauge
+            label="Couple moteur"
+            unit="Nm"
+            origValue={currentVehicle.nmOrig}
+            tuneValue={currentVehicle.nmTune}
+          />
 
           <div className="flex flex-col sm:flex-row gap-3 mt-6">
             {/* Bouton classique de réservation */}

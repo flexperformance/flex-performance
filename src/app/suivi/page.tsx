@@ -18,13 +18,21 @@ interface VehicleData {
 }
 
 const STEPS = [
-  { id: 1, label: "Véhicule réceptionné", icon: "🚗" },
-  { id: 2, label: "Diagnostic en cours", icon: "🔍" },
-  { id: 3, label: "Cartographie & Reprog", icon: "💻" },
-  { id: 4, label: "Tests sur route", icon: "🏎️" },
-  { id: 5, label: "Prêt à récupérer", icon: "🏁" },
-  { id: 6, label: "Véhicule récupéré", icon: "✅" },
+  { id: 1, label: "Véhicule réceptionné", icon: "🚗", color: "blue" },
+  { id: 2, label: "Diagnostic en cours", icon: "🔍", color: "amber" },
+  { id: 3, label: "Cartographie & Reprog", icon: "💻", color: "purple" },
+  { id: 4, label: "Tests sur route", icon: "🏎️", color: "flux" },
+  { id: 5, label: "Prêt à récupérer", icon: "🏁", color: "emerald" },
+  { id: 6, label: "Véhicule récupéré", icon: "✅", color: "emerald" },
 ];
+
+const STEP_COLOR_CLASSES: Record<string, { bg: string; border: string; text: string; ring: string }> = {
+  blue: { bg: "bg-blue-500", border: "border-blue-400/80", text: "text-blue-400", ring: "ring-blue-500/10" },
+  amber: { bg: "bg-amber-500", border: "border-amber-400/80", text: "text-amber-400", ring: "ring-amber-500/10" },
+  purple: { bg: "bg-purple-500", border: "border-purple-400/80", text: "text-purple-400", ring: "ring-purple-500/10" },
+  flux: { bg: "bg-flux", border: "border-flux/80", text: "text-flux", ring: "ring-flux/10" },
+  emerald: { bg: "bg-emerald-500", border: "border-emerald-400/80", text: "text-emerald-400", ring: "ring-emerald-500/10" },
+};
 
 function SuiviClientContent() {
   const searchParams = useSearchParams();
@@ -103,10 +111,10 @@ function SuiviClientContent() {
             </span>
           </div>
           <h1 className="font-display text-3xl sm:text-4xl font-black uppercase tracking-tight text-white">
-            Suivi <span className="text-flux">Atelier</span>
+            L'atelier <span className="text-flux">en direct</span>
           </h1>
           <p className="text-xs sm:text-sm text-mute mt-2 max-w-md mx-auto">
-            Entrez votre référence de suivi confidentielle reçue par WhatsApp pour suivre l'avancement de votre intervention en temps réel
+            Votre véhicule est entre de bonnes mains. Entrez votre référence confidentielle pour suivre chaque étape de la préparation, en temps réel.
           </p>
         </div>
 
@@ -154,8 +162,10 @@ function SuiviClientContent() {
               
               <div className="flex items-center gap-3">
                 <div className="bg-ink-2/90 border border-flux/40 px-4 py-3 rounded-2xl text-right shadow-inner">
-                  <span className="block text-[9px] font-mono uppercase text-mute tracking-widest">Statut du dossier</span>
-                  <span className="font-mono text-xs text-flux font-black tracking-wider uppercase">Sécurisé & Actif</span>
+                  <span className="block text-[9px] font-mono uppercase text-mute tracking-widest">Étape actuelle</span>
+                  <span className="font-mono text-xs text-flux font-black tracking-wider uppercase">
+                    {STEPS.find((s) => s.id === vehicle.current_step)?.label || "En cours"}
+                  </span>
                 </div>
                 {/* 🔄 Bouton d'actualisation rapide */}
                 <button
@@ -171,10 +181,19 @@ function SuiviClientContent() {
 
             {/* 🏁 Alerte si véhicule prêt à récupérer (Étape 5) */}
             {vehicle.current_step === 5 && (
-              <div className="mb-6 bg-emerald-500/15 border border-emerald-500/50 p-4.5 rounded-2xl text-center backdrop-blur-md animate-pulse">
-                <span className="text-2xl block mb-1">🎉</span>
-                <h4 className="font-display text-sm font-black uppercase text-emerald-400 tracking-wide">Votre véhicule est prêt !</h4>
-                <p className="text-xs text-snow mt-1 font-medium">Vous pouvez passer à l'atelier pour le récupérer aux heures d'ouverture.</p>
+              <div className="mb-6 bg-gradient-to-br from-emerald-500/20 to-emerald-500/5 border-2 border-emerald-500/60 p-5 rounded-2xl text-center backdrop-blur-md shadow-[0_0_30px_rgba(16,185,129,0.15)] animate-pulse">
+                <span className="text-3xl block mb-2">🎉</span>
+                <h4 className="font-display text-base font-black uppercase text-emerald-400 tracking-wide">Votre véhicule est prêt !</h4>
+                <p className="text-xs text-snow mt-1.5 font-medium">Passez à l'atelier pour le récupérer aux heures d'ouverture. Notre équipe vous attend.</p>
+              </div>
+            )}
+
+            {/* ✅ Message de remerciement si véhicule récupéré (Étape 6) */}
+            {vehicle.current_step === 6 && (
+              <div className="mb-6 bg-flux/10 border border-flux/40 p-5 rounded-2xl text-center backdrop-blur-md">
+                <span className="text-3xl block mb-2">🏁</span>
+                <h4 className="font-display text-base font-black uppercase text-flux tracking-wide">Merci de votre confiance !</h4>
+                <p className="text-xs text-snow mt-1.5 font-medium">Votre véhicule a été récupéré. L'équipe Flex Performance vous remercie et vous souhaite bonne route.</p>
               </div>
             )}
 
@@ -221,13 +240,14 @@ function SuiviClientContent() {
                 {STEPS.map((step) => {
                   const isCompleted = vehicle.current_step >= step.id;
                   const isCurrent = vehicle.current_step === step.id;
+                  const colors = STEP_COLOR_CLASSES[step.color];
 
                   return (
                     <div key={step.id} className="relative flex items-center gap-4 group">
                       <div
                         className={`absolute -left-[23px] w-6 h-6 rounded-full flex items-center justify-center text-[11px] transition-all font-mono ${
                           isCompleted
-                            ? "bg-flux text-ink font-bold shadow-[0_0_15px_rgba(var(--flux-rgb),0.5)] ring-4 ring-flux/10"
+                            ? `${colors.bg} text-ink font-bold shadow-md ring-4 ${colors.ring}`
                             : "bg-ink-2 border border-line text-mute"
                         }`}
                       >
@@ -237,18 +257,18 @@ function SuiviClientContent() {
                       <div
                         className={`flex-1 p-4 rounded-2xl border transition-all ${
                           isCurrent
-                            ? "bg-flux/10 border-flux/80 shadow-[0_4px_20px_rgba(var(--flux-rgb),0.1)]"
+                            ? `bg-ink-2/30 ${colors.border} shadow-[0_4px_20px_rgba(0,0,0,0.1)]`
                             : isCompleted
                             ? "bg-ink-2/40 border-line/50 opacity-80"
                             : "bg-ink-2/15 border-line/20 opacity-30"
                         }`}
                       >
                         <div className="flex items-center justify-between">
-                          <span className="font-display text-xs font-bold uppercase tracking-wider flex items-center gap-2.5 text-white">
+                          <span className={`font-display text-xs font-bold uppercase tracking-wider flex items-center gap-2.5 ${isCurrent ? colors.text : "text-white"}`}>
                             <span className="text-base">{step.icon}</span> {step.label}
                           </span>
                           {isCurrent && (
-                            <span className="bg-flux text-ink text-[10px] font-black uppercase px-2.5 py-1 rounded-full animate-pulse shadow-sm tracking-widest">
+                            <span className={`${colors.bg} text-ink text-[10px] font-black uppercase px-2.5 py-1 rounded-full animate-pulse shadow-sm tracking-widest`}>
                               {vehicle.current_step === 6 ? "Terminé" : "En cours"}
                             </span>
                           )}
