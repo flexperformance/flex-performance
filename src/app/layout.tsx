@@ -40,7 +40,7 @@ export const metadata: Metadata = {
     images: ["/og-image.png?v=5"],
   },
   icons: { 
-    icon: { url: "/favicon.png?v=3", sizes: "180X180", type: "image/png" },
+    icon: { url: "/favicon.png?v=4", sizes: "180X180", type: "image/png" },
   },
 };
 
