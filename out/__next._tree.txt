@@ -1,0 +1,3 @@
+:HL["/_next/static/chunks/05r0ubz_pj964.css","style"]
+:HL["https://images.pexels.com/photos/36608166/pexels-photo-36608166.jpeg?auto=compress&cs=tinysrgb&fit=crop&h=627&w=1200","image"]
+0:{"tree":{"name":"","param":null,"prefetchHints":16,"slots":{"children":{"name":"__PAGE__","param":null,"prefetchHints":0,"slots":null}}},"staleTime":300,"buildId":"7R2_jc-gtbSUQGqw2AE9T"}
