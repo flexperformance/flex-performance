@@ -35,9 +35,12 @@ export async function POST(req: NextRequest) {
   let adminPassword: string;
   try {
     adminPassword = getAdminPassword();
-  } catch {
-    // PROTECTION ANTI-ERREUR 500 : Valeur de secours si ADMIN_PASSWORD manque sur Vercel
-    adminPassword = "FlexPerformance2026!";
+  } catch (err) {
+    console.error(err);
+    return NextResponse.json(
+      { error: "Configuration serveur manquante (ADMIN_PASSWORD)." },
+      { status: 500 }
+    );
   }
 
   if (body.password !== adminPassword) {
