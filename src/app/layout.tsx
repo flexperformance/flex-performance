@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import Script from "next/script";
 import "./globals.css";
 import ConditionalChatWidget from "@/components/ConditionalChatWidget"; // 👈 Remplacement ici
+import { Analytics } from "@vercel/analytics/next"
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://flexperformance.fr"),
