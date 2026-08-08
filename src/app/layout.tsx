@@ -73,6 +73,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       <body className="bg-ink text-snow antialiased">
         {children}
         <ConditionalChatWidget /> {/* 👈 Utilisation du composant conditionnel */}
+        <Analytics />
       </body>
     </html>
   );
